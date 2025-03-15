@@ -20,6 +20,7 @@ interface GameState {
 const Game = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [antTargetX, setAntTargetX] = useState<number>(130);
+  const [touchStart, setTouchStart] = useState<number | null>(null);
   const [gameState, setGameState] = useState<GameState>({
     antPosition: { x: 130, y: 400 },
     thorns: [],
@@ -30,7 +31,7 @@ const Game = () => {
 
   // Game update and render logic
   useEffect(() => {
-    let gameUpdateLoop: number;
+    let gameUpdateLoop = 0;
     let animationFrameId: number;
     let lastUpdateTime = Date.now();
 
@@ -325,6 +326,39 @@ const Game = () => {
     }
   }, [gameState.gameOver]);
 
+  // Touch controls for mobile
+  useEffect(() => {
+    const handleTouchStart = (e: TouchEvent) => {
+      setTouchStart(e.touches[0].clientX);
+    };
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      if (!touchStart || gameState.isPaused || gameState.gameOver) return;
+
+      const touchEnd = e.changedTouches[0].clientX;
+      const swipeDistance = touchEnd - touchStart;
+
+      if (Math.abs(swipeDistance) > 30) { // Minimum swipe distance
+        moveAnt(swipeDistance > 0 ? 'right' : 'left');
+      }
+
+      setTouchStart(null);
+    };
+
+    const canvas = canvasRef.current;
+    if (canvas) {
+      canvas.addEventListener('touchstart', handleTouchStart);
+      canvas.addEventListener('touchend', handleTouchEnd);
+    }
+
+    return () => {
+      if (canvas) {
+        canvas.removeEventListener('touchstart', handleTouchStart);
+        canvas.removeEventListener('touchend', handleTouchEnd);
+      }
+    };
+  }, [touchStart, gameState.isPaused, gameState.gameOver, moveAnt]);
+
   // Keyboard controls
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -367,17 +401,42 @@ const Game = () => {
   return (
     <div style={{ textAlign: 'center', padding: '20px', backgroundColor: '#e8f3e8' }}>
       <h2 style={{ color: '#2d5a27', fontFamily: '"Segoe UI", Arial, sans-serif' }}>Climbing Ant</h2>
-      <canvas
-        ref={canvasRef}
-        width={300}
-        height={500}
-        style={{ 
-          border: '2px solid #2d5a27',
-          backgroundColor: '#f5f9f5',
-          borderRadius: '8px',
-          boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)'
-        }}
-      />
+      <div style={{ color: '#2d5a27', marginBottom: '10px', fontFamily: '"Segoe UI", Arial, sans-serif' }}>
+        Use ← → arrows or swipe to move
+      </div>
+      <div style={{ position: 'relative', display: 'inline-block' }}>
+        <canvas
+          ref={canvasRef}
+          width={300}
+          height={500}
+          style={{ 
+            border: '2px solid #2d5a27',
+            backgroundColor: '#f5f9f5',
+            borderRadius: '8px',
+            boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)'
+          }}
+        />
+        <button
+          onClick={() => setGameState(prev => ({ ...prev, isPaused: !prev.isPaused }))}
+          style={{
+            position: 'absolute',
+            top: '10px',
+            right: '10px',
+            padding: '8px 12px',
+            backgroundColor: gameState.isPaused ? '#8b0000' : '#2d5a27',
+            color: '#ffffff',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontFamily: '"Segoe UI", Arial, sans-serif',
+            fontSize: '14px',
+            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
+            transition: 'background-color 0.3s'
+          }}
+        >
+          {gameState.isPaused ? 'Resume' : 'Pause'}
+        </button>
+      </div>
       <div style={{ color: '#2d5a27', fontSize: '18px', marginTop: '10px', fontWeight: 'bold' }}>Score: {gameState.score}</div>
       {gameState.gameOver && (
         <div 
